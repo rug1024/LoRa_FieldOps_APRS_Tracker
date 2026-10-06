@@ -1,0 +1,30 @@
+name: T-Beam 1W custom firmware
+on:
+  push:
+    branches: [feature/ble-pin-oled-brightness]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PlatformIO
+        run: pip install platformio==6.1.19
+      - name: Build T-Beam 433 MHz 1W
+        run: pio run -e tbeam_433_1w_aprs
+      - name: Package firmware and configuration tool
+        run: |
+          mkdir -p artifact
+          cp .pio/build/tbeam_433_1w_aprs/firmware.bin artifact/tbeam_433_1w_custom_app.bin
+          cp serial_config.html FIELDOPS_CUSTOM.md artifact/
+          sha256sum artifact/tbeam_433_1w_custom_app.bin > artifact/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tbeam-433-1w-pin-brightness
+          path: artifact/
+          if-no-files-found: error

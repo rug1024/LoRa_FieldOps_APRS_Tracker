@@ -1608,6 +1608,16 @@ function renderConfig() {
     body.appendChild(mkBool('Rotate 180°',      disp.turn180,       v => sendCmd(`display turn180 ${boolStr(v)}`)));
     body.appendChild(mkBool('Invert display',   disp.invertDisplay, v => sendCmd(`display invert ${boolStr(v)}`)));
     body.appendChild(mkBool('LED indicator',    disp.ledEnabled,    v => sendCmd(`display led ${boolStr(v)}`)));
+    const brightnessLabel = document.createElement('label');
+    brightnessLabel.textContent = 'SH1106 OLED brightness (1–100%; save + reboot)';
+    const brightness = document.createElement('input');
+    brightness.type = 'number'; brightness.min = '1'; brightness.max = '100';
+    brightness.className = 'form-control'; brightness.value = disp.brightness ?? 100;
+    brightness.addEventListener('change', () => {
+      if (!brightness.reportValidity() || brightness.value === '') return;
+      markDirty(brightness); sendCmd(`display brightness ${brightness.value}`);
+    });
+    brightnessLabel.appendChild(brightness); body.appendChild(brightnessLabel);
   });
 
   // ── Bluetooth ────────────────────────────
@@ -1624,6 +1634,16 @@ function renderConfig() {
     inp.addEventListener('change', () => { markDirty(inp); sendCmd(`bt name ${inp.value}`); });
     row.appendChild(inp);
     body.appendChild(row);
+    const pinLabel = document.createElement('label');
+    pinLabel.textContent = 'ESP32 BLE PIN (six digits; empty disables protection; save + reboot)';
+    const pin = document.createElement('input');
+    pin.type = 'password'; pin.inputMode = 'numeric'; pin.pattern = '[0-9]{6}'; pin.maxLength = 6;
+    pin.className = 'form-control'; pin.value = bt.pairingPin ?? '';
+    pin.addEventListener('change', () => {
+      if (!pin.reportValidity()) return;
+      markDirty(pin); sendCmd(`bt pin ${pin.value || 'off'}`);
+    });
+    pinLabel.appendChild(pin); body.appendChild(pinLabel);
   });
 
   // ── Battery & Altitude ───────────────────

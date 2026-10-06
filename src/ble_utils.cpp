@@ -223,6 +223,8 @@ namespace BLE_Utils {
 #else
 
 #include <NimBLEDevice.h>
+#include <Preferences.h>
+#include "user_preferences.h"
 
 static NimBLEServer*         pServer             = nullptr;
 static NimBLECharacteristic* pCharacteristicTx   = nullptr;
@@ -232,22 +234,47 @@ static bool     shouldSendBLEtoLoRa = false;
 static String   BLEToLoRaPacket     = "";
 static String   kissSerialBuffer    = "";
 
+// Snapshot at BLE startup: configuration edits must not change security mid-session.
+static bool pairingRequired = false;
+static uint16_t activeConnection = BLE_HS_CONN_HANDLE_NONE;
+
 class MyServerCallbacks : public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer* pServer) override {
-        bluetoothConnected = true;
-        logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "BLE", "Client connected");
-        delay(100);
+    void onConnect(NimBLEServer* server, ble_gap_conn_desc* desc) override {
+        if (activeConnection != BLE_HS_CONN_HANDLE_NONE) {
+            server->disconnect(desc->conn_handle);
+            return;
+        }
+        activeConnection = desc->conn_handle;
+        bluetoothConnected = !pairingRequired;
+        if (pairingRequired) {
+            const int result = NimBLEDevice::startSecurity(desc->conn_handle);
+            if (result != 0 && result != BLE_HS_EALREADY) server->disconnect(desc->conn_handle);
+        }
     }
-    void onDisconnect(NimBLEServer* pServer) override {
+    void onAuthenticationComplete(ble_gap_conn_desc* desc) override {
+        if (desc->conn_handle != activeConnection) return;
+        if (pairingRequired && (!desc->sec_state.encrypted || !desc->sec_state.authenticated)) {
+            bluetoothConnected = false;
+            pServer->disconnect(desc->conn_handle);
+            return;
+        }
+        bluetoothConnected = true;
+        logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "BLE", "Client authenticated");
+    }
+    void onDisconnect(NimBLEServer* server, ble_gap_conn_desc* desc) override {
+        if (desc->conn_handle != activeConnection) return;
         bluetoothConnected = false;
-        logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "BLE", "Client disconnected, restarting advertising");
-        delay(100);
-        pServer->startAdvertising();
+        activeConnection = BLE_HS_CONN_HANDLE_NONE;
+        shouldSendBLEtoLoRa = false;
+        kissSerialBuffer = "";
+        server->startAdvertising();
     }
 };
 
 class MyCallbacks : public NimBLECharacteristicCallbacks {
-    void onWrite(NimBLECharacteristic* pCharacteristic) override {
+    void onWrite(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc) override {
+        if (desc->conn_handle != activeConnection || !bluetoothConnected) return;
+        if (pairingRequired && (!desc->sec_state.encrypted || !desc->sec_state.authenticated)) return;
         std::string receivedData = pCharacteristic->getValue();
         logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "BLE RX", "write callback fired, %d bytes", (int)receivedData.size());
 
@@ -314,17 +341,54 @@ namespace BLE_Utils {
     }
 
     void setup() {
+        bluetoothConnected = false;
+        activeConnection = BLE_HS_CONN_HANDLE_NONE;
+        pairingRequired = Config.bluetooth.pairingPin.length() > 0;
+        if (pairingRequired && !validPairingPin(Config.bluetooth.pairingPin)) {
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "BLE", "Invalid PIN configuration; BLE disabled");
+            return; // Fail closed for malformed/imported settings.
+        }
         NimBLEDevice::init(Config.bluetooth.deviceName.c_str());
+        // Bond keys otherwise bypass a newly configured PIN. Remember the policy
+        // across boots, and revoke all previous bonds whenever it changes.
+        Preferences securityPrefs;
+        if (!securityPrefs.begin("fieldops-ble", false)) {
+            NimBLEDevice::deinit();
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "BLE", "Security storage unavailable; BLE disabled");
+            return;
+        }
+        if (securityPrefs.getString("pin", "unset") != Config.bluetooth.pairingPin) {
+            NimBLEDevice::deleteAllBonds();
+            if (NimBLEDevice::getNumBonds() != 0) {
+                securityPrefs.end();
+                NimBLEDevice::deinit();
+                logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "BLE", "Cannot revoke old bonds; BLE disabled");
+                return;
+            }
+            securityPrefs.putString("pin", Config.bluetooth.pairingPin);
+            if (securityPrefs.getString("pin", "unset") != Config.bluetooth.pairingPin) {
+                securityPrefs.end();
+                NimBLEDevice::deinit();
+                logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "BLE", "Cannot save security policy; BLE disabled");
+                return;
+            }
+        }
+        securityPrefs.end();
+        NimBLEDevice::setSecurityAuth(pairingRequired, pairingRequired, true);
+        NimBLEDevice::setSecurityIOCap(pairingRequired ? BLE_HS_IO_DISPLAY_ONLY : BLE_HS_IO_NO_INPUT_OUTPUT);
+        if (pairingRequired) NimBLEDevice::setSecurityPasskey(Config.bluetooth.pairingPin.toInt());
         pServer = NimBLEDevice::createServer();
         pServer->setCallbacks(new MyServerCallbacks());
 
         NimBLEService* pService = pServer->createService(BLE_SERVICE_UUID);
         pCharacteristicTx = pService->createCharacteristic(
             BLE_CHAR_UUID_TX,
-            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY |
+            (pairingRequired ? NIMBLE_PROPERTY::READ_AUTHEN : 0));
         pCharacteristicRx = pService->createCharacteristic(
             BLE_CHAR_UUID_RX,
-            NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
+            NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR |
+            (pairingRequired ? NIMBLE_PROPERTY::WRITE_AUTHEN : 0));
         pCharacteristicRx->setCallbacks(new MyCallbacks());
 
         pService->start();
@@ -341,7 +405,7 @@ namespace BLE_Utils {
     }
 
     void sendToLoRa() {
-        if (!shouldSendBLEtoLoRa) return;
+        if (!shouldSendBLEtoLoRa || !bluetoothConnected) return;
         logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "BLE TX", "decoded: \"%s\"", BLEToLoRaPacket.c_str());
         LoRa_Utils::sendNewPacket(BLEToLoRaPacket);   // displayTx() fires inside sendNewPacket
         BLEToLoRaPacket         = "";

@@ -15,6 +15,7 @@
 #include "serial_setup.h"
 #include "board_pinout.h"
 #include "configuration.h"
+#include "user_preferences.h"
 #include "display.h"
 #include "smartbeacon_utils.h"
 #include "kiss_utils.h"
@@ -158,6 +159,10 @@ namespace SERIAL_Setup {
         Serial.println(F("\n-- peripherals --"));
         Serial.println(F("  display eco|turn180|led on|off"));
         Serial.println(F("  display timeout <sec>"));
+        Serial.println(F("  display brightness <1..100>  SH1106 OLED; save + reboot"));
+#ifdef HAS_NIMBLE
+        Serial.println(F("  bt pin <6 digits|off>        save + reboot; clears old bonds"));
+#endif
         Serial.println(F("  bt on|off                  name <text>"));
         Serial.println(F("  bat sendv|alwaysv on|off"));
         Serial.println(F("  bat sleepv <volts>          bat read"));
@@ -275,11 +280,13 @@ namespace SERIAL_Setup {
             kv("turn180", Config.display.turn180);
             kv("invert ", Config.display.invertDisplay);
             kv("led    ", Config.display.ledEnabled);
+            kv("brightness", Config.display.brightness);
         }
         if (section == "" || section == "bt") {
             hdr("bt");
             kv("active", Config.bluetooth.active);
             kv("name  ", Config.bluetooth.deviceName);
+            kv("PIN enabled", Config.bluetooth.pairingPin.length() > 0);
         }
         if (section == "" || section == "bat") {
             const Battery& b = Config.battery;
@@ -510,6 +517,12 @@ namespace SERIAL_Setup {
         else if (sub == "turn180") applyBool(tk[2], Config.display.turn180,       "display.turn180");
         else if (sub == "invert")  { bool v = (tk[2] == "on" || tk[2] == "1" || tk[2] == "true"); displaySetInvert(v); ok("display.invert = " + String(v ? "on" : "off")); }
         else if (sub == "led")     applyBool(tk[2], Config.display.ledEnabled,    "display.led");
+        else if (sub == "brightness") {
+            int brightness;
+            if (!parseOledBrightness(tk[2], brightness)) { err("brightness must be 1..100"); return; }
+            Config.display.brightness = brightness;
+            ok("display.brightness updated; save + reboot");
+        }
         else if (sub == "timeout") { Config.display.timeout = tk[2].toInt(); ok("display.timeout = " + String(Config.display.timeout)); }
         else err("unknown display subcommand: " + sub);
     }
@@ -519,6 +532,15 @@ namespace SERIAL_Setup {
         const String& sub = tk[1];
         if      (sub == "on" || sub == "off" || sub == "true" || sub == "false") applyBool(tk[1], Config.bluetooth.active, "bt.active");
         else if (sub == "name") { Config.bluetooth.deviceName = restOfLine(line, 2); ok("bt.name = " + Config.bluetooth.deviceName); }
+#ifdef HAS_NIMBLE
+        else if (sub == "pin") {
+            if (n != 3 || (tk[2] != "off" && !validPairingPin(tk[2]))) {
+                err("bt pin <exactly six digits|off>"); return;
+            }
+            Config.bluetooth.pairingPin = tk[2] == "off" ? "" : tk[2];
+            ok("Bluetooth PIN updated; save + reboot. Forget old phone pairing after a PIN change.");
+        }
+#endif
         else err("unknown bt subcommand: " + sub);
     }
 

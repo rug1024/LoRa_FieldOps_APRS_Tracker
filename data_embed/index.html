@@ -290,6 +290,11 @@
                                                     <input class="form-check-input" type="checkbox" id="display.ledEnabled" name="display.ledEnabled" />
                                                     <label class="form-check-label" for="display.ledEnabled">LED indicator</label>
                                                 </div>
+                                                <div class="mt-2">
+                                                    <label for="display.brightness">SH1106 OLED brightness (%)</label>
+                                                    <input type="number" class="form-control" id="display.brightness" name="display.brightness" min="1" max="100" value="100" required />
+                                                    <p class="form-text">Save and restart to apply brightness.</p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -312,6 +317,9 @@
                                             </div>
                                             <input type="text" class="form-control" style="max-width:16rem" id="bluetooth.deviceName" name="bluetooth.deviceName" maxlength="20" placeholder="Device name" />
                                         </div>
+                                        <label for="bluetooth.pairingPin">BLE pairing PIN (ESP32 / ESP32-S3)</label>
+                                        <input type="password" class="form-control" id="bluetooth.pairingPin" name="bluetooth.pairingPin" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" />
+                                        <p class="form-text">Six digits; empty disables PIN protection. Save and restart. After changing the PIN, forget the old pairing on your phone and pair again.</p>
                                         <p class="form-text mt-2 mb-0">KISS TNC — connects to APRS.fi, APRSDroid, Pinpoint. Mutually exclusive with WiFi</p>
                                     </div>
                                 </div>

@@ -408,7 +408,7 @@ void displaySetup() {
             display.setTextColor(WHITE);
         #else
             display.setTextColor(SH110X_WHITE);
-            display.setContrast(255);
+            display.setContrast((constrain(Config.display.brightness, 1, 100) * 255 + 50) / 100);
         #endif
         display.setTextWrap(false);   // clip overlong lines instead of wrapping
         display.setTextSize(1);

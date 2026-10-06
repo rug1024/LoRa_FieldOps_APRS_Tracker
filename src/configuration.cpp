@@ -81,8 +81,10 @@ bool Configuration::writeFile() {
         data["display"]["timeout"]                  = display.timeout;
         data["display"]["turn180"]                  = display.turn180;
         data["display"]["invertDisplay"]            = display.invertDisplay;
+        data["display"]["brightness"]               = display.brightness;
         data["display"]["ledEnabled"]               = display.ledEnabled;
 
+        data["bluetooth"]["pairingPin"]              = bluetooth.pairingPin;
         data["bluetooth"]["active"]                 = bluetooth.active;
         data["bluetooth"]["deviceName"]             = bluetooth.deviceName;
 
@@ -232,15 +234,21 @@ bool Configuration::readFile() {
             data["display"]["timeout"].isNull() ||
             data["display"]["turn180"].isNull() ||
             data["display"]["invertDisplay"].isNull() ||
+            data["display"]["brightness"].isNull() ||
             data["display"]["ledEnabled"].isNull()) needsRewrite = true;
         display.ecoMode                 = data["display"]["ecoMode"] | false;
         display.timeout                 = data["display"]["timeout"] | 4;
         display.turn180                 = data["display"]["turn180"] | false;
         display.invertDisplay           = data["display"]["invertDisplay"] | false;
+        display.brightness = constrain(data["display"]["brightness"] | 100, 1, 100);
+        if (data["bluetooth"]["pairingPin"].isNull()) needsRewrite = true;
         display.ledEnabled              = data["display"]["ledEnabled"] | true;
 
         if (data["bluetooth"]["active"].isNull() ||
             data["bluetooth"]["deviceName"].isNull()) needsRewrite = true;
+        bluetooth.pairingPin = data["bluetooth"]["pairingPin"] | "";
+        if (!data["bluetooth"]["pairingPin"].isNull() && !data["bluetooth"]["pairingPin"].is<const char*>())
+            bluetooth.pairingPin = "INVALID"; // fail closed at BLE startup
         bluetooth.active                = data["bluetooth"]["active"] | false;
         bluetooth.deviceName            = data["bluetooth"]["deviceName"] | "LoRaTracker";
 
@@ -440,8 +448,10 @@ void Configuration::setDefaultValues() {
     display.timeout                 = 4;
     display.turn180                 = false;
     display.invertDisplay           = false;
+    display.brightness              = 100;
     display.ledEnabled              = true;
 
+    bluetooth.pairingPin            = "";
     bluetooth.active                = false;
     bluetooth.deviceName            = "LoRaTracker";
 

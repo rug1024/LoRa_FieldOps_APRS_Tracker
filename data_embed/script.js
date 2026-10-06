@@ -185,9 +185,11 @@ function loadSettings(s) {
     setVal('display.timeout',      disp.timeout      ?? 4);
     setVal('display.turn180',      disp.turn180      ?? false);
     setVal('display.invertDisplay',disp.invertDisplay?? false);
+    setVal('display.brightness',  disp.brightness ?? 100);
     setVal('display.ledEnabled',   disp.ledEnabled   ?? true);
 
     const bt = s.bluetooth ?? {};
+    setVal('bluetooth.pairingPin', bt.pairingPin ?? '');
     setVal('bluetooth.active',     bt.active     ?? false);
     setVal('bluetooth.deviceName', bt.deviceName ?? 'LoRaAPRS');
 

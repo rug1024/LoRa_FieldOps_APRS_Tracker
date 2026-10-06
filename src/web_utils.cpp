@@ -24,6 +24,7 @@
 #include <vector>
 #include "board_pinout.h"
 #include "configuration.h"
+#include "user_preferences.h"
 #include "web_utils.h"
 #include "wifi_utils.h"
 #include "display.h"
@@ -199,6 +200,19 @@ namespace WEB_Utils {
             return defaultValue;
         };
 
+        int brightness = Config.display.brightness;
+        if (request->hasParam("display.brightness", true) &&
+            !parseOledBrightness(getParamStringSafe("display.brightness"), brightness)) {
+            request->send(400, "text/plain", "OLED brightness must be 1..100"); return;
+        }
+#ifdef HAS_NIMBLE
+        String pairingPin = getParamStringSafe("bluetooth.pairingPin", Config.bluetooth.pairingPin);
+        if (pairingPin.length() && !validPairingPin(pairingPin)) {
+            request->send(400, "text/plain", "Bluetooth PIN must contain exactly six digits, or be empty"); return;
+        }
+        Config.bluetooth.pairingPin = pairingPin;
+#endif
+        Config.display.brightness = brightness;
         //  Beacon (single)
         Config.beacons[0].callsign      = getParamStringSafe("beacons.0.callsign",     Config.beacons[0].callsign);
         Config.beacons[0].symbol        = getParamStringSafe("beacons.0.symbol",        Config.beacons[0].symbol);
