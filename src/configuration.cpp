@@ -83,6 +83,7 @@ bool Configuration::writeFile() {
         data["display"]["invertDisplay"]            = display.invertDisplay;
         data["display"]["ledEnabled"]               = display.ledEnabled;
 
+        data["bluetooth"]["pairingPin"]              = bluetooth.pairingPin;
         data["bluetooth"]["active"]                 = bluetooth.active;
         data["bluetooth"]["deviceName"]             = bluetooth.deviceName;
 
@@ -239,8 +240,12 @@ bool Configuration::readFile() {
         display.invertDisplay           = data["display"]["invertDisplay"] | false;
         display.ledEnabled              = data["display"]["ledEnabled"] | true;
 
-        if (data["bluetooth"]["active"].isNull() ||
+        if (data["bluetooth"]["pairingPin"].isNull() ||
+            data["bluetooth"]["active"].isNull() ||
             data["bluetooth"]["deviceName"].isNull()) needsRewrite = true;
+        bluetooth.pairingPin = data["bluetooth"]["pairingPin"] | "";
+        if (!data["bluetooth"]["pairingPin"].isNull() && !data["bluetooth"]["pairingPin"].is<const char*>())
+            bluetooth.pairingPin = "INVALID"; // fail closed at BLE startup
         bluetooth.active                = data["bluetooth"]["active"] | false;
         bluetooth.deviceName            = data["bluetooth"]["deviceName"] | "LoRaTracker";
 
@@ -442,6 +447,7 @@ void Configuration::setDefaultValues() {
     display.invertDisplay           = false;
     display.ledEnabled              = true;
 
+    bluetooth.pairingPin            = "";
     bluetooth.active                = false;
     bluetooth.deviceName            = "LoRaTracker";
 

@@ -15,6 +15,7 @@
 #include "serial_setup.h"
 #include "board_pinout.h"
 #include "configuration.h"
+#include "user_preferences.h"
 #include "display.h"
 #include "smartbeacon_utils.h"
 #include "kiss_utils.h"
@@ -158,6 +159,9 @@ namespace SERIAL_Setup {
         Serial.println(F("\n-- peripherals --"));
         Serial.println(F("  display eco|turn180|led on|off"));
         Serial.println(F("  display timeout <sec>"));
+#ifdef HAS_NIMBLE
+        Serial.println(F("  bt pin <6 digits|off>        save + reboot; clears old bonds"));
+#endif
         Serial.println(F("  bt on|off                  name <text>"));
         Serial.println(F("  bat sendv|alwaysv on|off"));
         Serial.println(F("  bat sleepv <volts>          bat read"));
@@ -280,6 +284,7 @@ namespace SERIAL_Setup {
             hdr("bt");
             kv("active", Config.bluetooth.active);
             kv("name  ", Config.bluetooth.deviceName);
+            kv("PIN enabled", Config.bluetooth.pairingPin.length() > 0);
         }
         if (section == "" || section == "bat") {
             const Battery& b = Config.battery;
@@ -519,6 +524,15 @@ namespace SERIAL_Setup {
         const String& sub = tk[1];
         if      (sub == "on" || sub == "off" || sub == "true" || sub == "false") applyBool(tk[1], Config.bluetooth.active, "bt.active");
         else if (sub == "name") { Config.bluetooth.deviceName = restOfLine(line, 2); ok("bt.name = " + Config.bluetooth.deviceName); }
+#ifdef HAS_NIMBLE
+        else if (sub == "pin") {
+            if (n != 3 || (tk[2] != "off" && !validPairingPin(tk[2]))) {
+                err("bt pin <exactly six digits|off>"); return;
+            }
+            Config.bluetooth.pairingPin = tk[2] == "off" ? "" : tk[2];
+            ok("Bluetooth PIN updated; save + reboot. Forget old phone pairing after a PIN change.");
+        }
+#endif
         else err("unknown bt subcommand: " + sub);
     }
 

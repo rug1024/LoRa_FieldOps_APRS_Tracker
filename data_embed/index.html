@@ -312,6 +312,9 @@
                                             </div>
                                             <input type="text" class="form-control" style="max-width:16rem" id="bluetooth.deviceName" name="bluetooth.deviceName" maxlength="20" placeholder="Device name" />
                                         </div>
+                                        <label for="bluetooth.pairingPin">BLE pairing PIN (ESP32 / ESP32-S3)</label>
+                                        <input type="password" class="form-control" id="bluetooth.pairingPin" name="bluetooth.pairingPin" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" />
+                                        <p class="form-text">Six digits; empty disables PIN protection. Save and restart. After changing the PIN, forget the old pairing on your phone and pair again.</p>
                                         <p class="form-text mt-2 mb-0">KISS TNC — connects to APRS.fi, APRSDroid, Pinpoint. Mutually exclusive with WiFi</p>
                                     </div>
                                 </div>

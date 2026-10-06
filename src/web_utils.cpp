@@ -24,6 +24,7 @@
 #include <vector>
 #include "board_pinout.h"
 #include "configuration.h"
+#include "user_preferences.h"
 #include "web_utils.h"
 #include "wifi_utils.h"
 #include "display.h"
@@ -199,6 +200,13 @@ namespace WEB_Utils {
             return defaultValue;
         };
 
+#ifdef HAS_NIMBLE
+        String pairingPin = getParamStringSafe("bluetooth.pairingPin", Config.bluetooth.pairingPin);
+        if (pairingPin.length() && !validPairingPin(pairingPin)) {
+            request->send(400, "text/plain", "Bluetooth PIN must contain exactly six digits, or be empty"); return;
+        }
+        Config.bluetooth.pairingPin = pairingPin;
+#endif
         //  Beacon (single)
         Config.beacons[0].callsign      = getParamStringSafe("beacons.0.callsign",     Config.beacons[0].callsign);
         Config.beacons[0].symbol        = getParamStringSafe("beacons.0.symbol",        Config.beacons[0].symbol);

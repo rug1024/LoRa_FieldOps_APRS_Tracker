@@ -188,6 +188,7 @@ function loadSettings(s) {
     setVal('display.ledEnabled',   disp.ledEnabled   ?? true);
 
     const bt = s.bluetooth ?? {};
+    setVal('bluetooth.pairingPin', bt.pairingPin ?? '');
     setVal('bluetooth.active',     bt.active     ?? false);
     setVal('bluetooth.deviceName', bt.deviceName ?? 'LoRaAPRS');
 

@@ -117,6 +117,7 @@ class BLUETOOTH {
 public:
     bool    active;
     String  deviceName;
+    String  pairingPin; // NimBLE: empty = open, otherwise exactly six digits
     // Stack and framing are board-determined: nRF52 uses Bluefruit BLE,
     // ESP32 uses NimBLE when available, otherwise BT Classic SPP.
     // All paths use KISS (AX.25) framing — no config needed.
