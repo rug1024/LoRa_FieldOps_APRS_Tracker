@@ -19,12 +19,14 @@ jobs:
       - name: Build firmware and filesystem
         run: |
           pio run -e tbeam_433_1w_aprs
+          mkdir -p saved
+          cp .pio/build/tbeam_433_1w_aprs/{firmware,bootloader,partitions}.bin saved/
           pio run -e tbeam_433_1w_aprs -t buildfs
       - name: Package binaries
         run: |
           mkdir -p output
-          cp .pio/build/tbeam_433_1w_aprs/firmware.bin output/tbeam_433_1w_aprs_firmware.bin
-          python ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32s3 merge_bin -o output/tbeam_433_1w_aprs_factory.bin --flash_mode dio --flash_size 8MB 0x0 .pio/build/tbeam_433_1w_aprs/bootloader.bin 0x8000 .pio/build/tbeam_433_1w_aprs/partitions.bin 0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin 0x10000 .pio/build/tbeam_433_1w_aprs/firmware.bin 0x5f0000 .pio/build/tbeam_433_1w_aprs/spiffs.bin
+          cp saved/firmware.bin output/tbeam_433_1w_aprs_firmware.bin
+          python ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32s3 merge_bin -o output/tbeam_433_1w_aprs_factory.bin --flash_mode dio --flash_size 8MB 0x0 saved/bootloader.bin 0x8000 saved/partitions.bin 0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin 0x10000 saved/firmware.bin 0x5f0000 .pio/build/tbeam_433_1w_aprs/spiffs.bin
           sha256sum output/*.bin > output/SHA256SUMS.txt
           git rev-parse HEAD > output/BUILD_COMMIT.txt
       - uses: actions/upload-artifact@v4
