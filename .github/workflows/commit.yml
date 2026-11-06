@@ -1,46 +1,34 @@
-name: Commit Test Build
-
+name: T-Beam 1W test firmware
 on:
-    push:
-        branches:
-            - '*'
-
+  push:
+    branches: [build-tbeam-main-66c7381]
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-    build:
-        runs-on: ubuntu-latest
-        strategy:
-            fail-fast: false
-            matrix:
-              target:
-                - name: heltec_v3_433_aprs
-                  chip: esp32s3
-                - name: tbeam_433_aprs
-                  chip: esp32
-                - name: tbeam_433_1w_aprs
-                  chip: esp32s3
-                - name: lilygo_t3_433_aprs
-                  chip: esp32
-                - name: lilygo_t3s3_433_aprs
-                  chip: esp32s3
-                - name: LoRanger_V1
-                  chip: esp32s3
-                - name: heltec_wireless_tracker_433_aprs
-                  chip: esp32s3
-                - name: heltec_t114
-                  chip: nrf52
-        steps:
-            - uses: actions/checkout@v7
-
-            - uses: actions/setup-python@v7
-              with:
-                  python-version: "3.13"
-
-            - name: Install PlatformIO Core
-              run: pip install --upgrade platformio
-
-            - name: Build target
-              run: pio run -e ${{ matrix.target.name }}
-
-            - name: Build FS
-              if: matrix.target.chip != 'nrf52'
-              run: pio run --target buildfs -e ${{ matrix.target.name }}
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install platformio==6.2.0
+      - name: Build firmware and filesystem
+        run: |
+          pio run -e tbeam_433_1w_aprs
+          pio run -e tbeam_433_1w_aprs -t buildfs
+      - name: Package binaries
+        run: |
+          mkdir -p output
+          cp .pio/build/tbeam_433_1w_aprs/firmware.bin output/tbeam_433_1w_aprs_firmware.bin
+          python ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32s3 merge_bin -o output/tbeam_433_1w_aprs_factory.bin --flash_mode dio --flash_size 8MB 0x0 .pio/build/tbeam_433_1w_aprs/bootloader.bin 0x8000 .pio/build/tbeam_433_1w_aprs/partitions.bin 0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin 0x10000 .pio/build/tbeam_433_1w_aprs/firmware.bin 0x5f0000 .pio/build/tbeam_433_1w_aprs/spiffs.bin
+          sha256sum output/*.bin > output/SHA256SUMS.txt
+          git rev-parse HEAD > output/BUILD_COMMIT.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fieldops-tbeam1w-main-66c7381
+          path: output/
+          retention-days: 30
